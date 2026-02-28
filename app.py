@@ -187,3 +187,81 @@ for idx, (name, df) in enumerate(chart_data.items()):
             
             # 차트를 화면에 렌더링
             st.altair_chart(area + line, use_container_width=True)
+
+import plotly.express as px
+
+# --- 기존 차트 코드 아래에 붙여넣으세요 ---
+
+st.markdown("<br>", unsafe_allow_html=True)
+st.subheader("🗺️ 국내 주요 섹터 히트맵 (Market Heatmap)")
+
+@st.cache_data(ttl=600)
+def get_heatmap_data():
+    # 시가총액과 등락률을 볼 주요 섹터별 종목 설정
+    # 원하시는 종목(예: 테슬라 'TSLA', 애플 'AAPL' 등)을 여기에 계속 추가할 수 있습니다.
+    portfolio = {
+        "반도체": {"삼성전자": "005930.KS", "SK하이닉스": "000660.KS", "한미반도체": "042700.KS"},
+        "배터리/화학": {"LG에너지솔루션": "373220.KS", "POSCO홀딩스": "005490.KS", "LG화학": "051910.KS"},
+        "IT/플랫폼": {"NAVER": "035420.KS", "카카오": "035720.KS"},
+        "자동차": {"현대차": "005380.KS", "기아": "000270.KS"},
+        "바이오": {"삼성바이오로직스": "207940.KS", "셀트리온": "068270.KS"},
+        "금융": {"KB금융": "105560.KS", "신한지주": "055550.KS"}
+    }
+
+    data = []
+    for sector, stocks in portfolio.items():
+        for name, ticker in stocks.items():
+            try:
+                info = yf.Ticker(ticker).fast_info
+                mcap = info['market_cap']
+                price = info['last_price']
+                prev = info['previous_close']
+                pct_change = ((price - prev) / prev) * 100
+
+                data.append({
+                    "섹터": sector,
+                    "종목명": name,
+                    "시가총액": mcap,
+                    "등락률": pct_change,
+                    "텍스트표시": f"<b>{name}</b><br>{pct_change:+.2f}%"
+                })
+            except:
+                continue
+    return pd.DataFrame(data)
+
+with st.spinner("히트맵 데이터를 불러오는 중입니다..."):
+    heatmap_df = get_heatmap_data()
+
+if not heatmap_df.empty:
+    # Plotly를 이용한 트리맵(히트맵) 생성
+    fig = px.treemap(
+        heatmap_df,
+        path=[px.Constant("한국 주요증시"), '섹터', '종목명'], # 계층 구조 설정
+        values='시가총액', # 사각형 크기
+        color='등락률',   # 사각형 색상
+        color_continuous_scale=[[0, '#3b82f6'], [0.5, '#131722'], [1, '#ff4b4b']], # 파랑 -> 검정 -> 빨강
+        color_continuous_midpoint=0,
+        custom_data=['텍스트표시']
+    )
+
+    # 디자인 디테일 튜닝 (트레이딩뷰 다크모드 스타일)
+    fig.update_traces(
+        texttemplate="%{customdata[0]}",
+        textposition="middle center",
+        textfont=dict(color="white", size=16),
+        marker=dict(line=dict(color='#0e1117', width=2)) # 블록 사이 간격
+    )
+    
+    fig.update_layout(
+        margin=dict(t=30, l=10, r=10, b=10),
+        paper_bgcolor="#0e1117",
+        plot_bgcolor="#0e1117",
+        coloraxis_colorbar=dict(
+            title="등락률 (%)",
+            tickfont=dict(color="white"),
+            titlefont=dict(color="white")
+        )
+    )
+
+    # Streamlit 화면에 꽉 차게 출력
+    st.plotly_chart(fig, use_container_width=True)
