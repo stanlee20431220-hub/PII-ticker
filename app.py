@@ -103,6 +103,9 @@ st.caption(f"최종 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("📊 주요 지표 및 관심 종목 차트")
 
+st.markdown("<br>", unsafe_allow_html=True)
+st.subheader("📊 주요 지표 및 관심 종목 차트")
+
 # 4. 차트 데이터를 가져오는 함수 (1개월치 데이터 로드)
 @st.cache_data(ttl=600)
 def get_chart_data():
@@ -148,12 +151,12 @@ for idx, (name, df) in enumerate(chart_data.items()):
             color_hex = "#ff4b4b" if diff >= 0 else "#3b82f6"
             sign = "▲" if diff >= 0 else "▼"
             
-            # 카드 상단 텍스트 (이름, 현재가, 등락률)
+            # 글씨 겹침/잘림 해결을 위해 간격(margin) 최적화
             st.markdown(f"""
-            <div style="margin-bottom: -15px;">
-                <div style="color: #8b92a5; font-size: 15px; font-weight: 600;">{name}</div>
+            <div>
+                <div style="color: #8b92a5; font-size: 14px; font-weight: 600;">{name}</div>
                 <div style="color: #d1d4dc; font-size: 24px; font-weight: bold; margin: 4px 0;">{p_str}</div>
-                <div style="color: {color_hex}; font-size: 15px; font-weight: 600;">{sign} {abs(diff):.2f} ({pct:+.2f}%)</div>
+                <div style="color: {color_hex}; font-size: 15px; font-weight: 600; margin-bottom: 8px;">{sign} {abs(diff):.2f} ({pct:+.2f}%)</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -161,19 +164,18 @@ for idx, (name, df) in enumerate(chart_data.items()):
             chart_df = df.reset_index()
             chart_df = chart_df.rename(columns={chart_df.columns[0]: 'Date'})
             
-            # 차트 상하 여백 조절을 위한 최소/최대값 계산
-            min_val, max_val = chart_df['Close'].min(), chart_df['Close'].max()
-            margin = (max_val - min_val) * 0.1 if max_val != min_val else 1
+            # 💡 핵심 수정: Y축이 0부터 시작하지 않고 데이터 범위에 딱 맞게(zero=False) 설정
+            base_chart = alt.Chart(chart_df).encode(
+                x=alt.X('Date:T', axis=None), # X축 숨김
+                y=alt.Y('Close:Q', scale=alt.Scale(zero=False), axis=None), # Y축 숨김 및 범위 자동 조절
+                tooltip=['Date:T', 'Close:Q']
+            ).properties(height=80) # 차트 높이를 80으로 줄여 카드 안에 쏙 들어가게 조절
             
             # 선 차트 생성
-            line = alt.Chart(chart_df).mark_line(color=color_hex, strokeWidth=2).encode(
-                x=alt.X('Date:T', axis=None), # X축 숨김
-                y=alt.Y('Close:Q', scale=alt.Scale(domain=[min_val - margin, max_val + margin]), axis=None), # Y축 숨김
-                tooltip=['Date:T', 'Close:Q'] # 마우스 오버 시 상세 데이터 표시
-            ).properties(height=100)
+            line = base_chart.mark_line(color=color_hex, strokeWidth=2)
             
             # 하단 그라데이션 면적 추가 (트레이딩뷰 스타일)
-            area = alt.Chart(chart_df).mark_area(
+            area = base_chart.mark_area(
                 line={'color': 'transparent'},
                 color=alt.Gradient(
                     gradient='linear',
@@ -181,10 +183,7 @@ for idx, (name, df) in enumerate(chart_data.items()):
                            alt.GradientStop(color='rgba(0,0,0,0)', offset=1)],
                     x1=1, x2=1, y1=1, y2=0
                 )
-            ).encode(
-                x=alt.X('Date:T', axis=None),
-                y=alt.Y('Close:Q', scale=alt.Scale(domain=[min_val - margin, max_val + margin]), axis=None)
-            ).properties(height=100)
+            )
             
             # 차트를 화면에 렌더링
             st.altair_chart(area + line, use_container_width=True)
