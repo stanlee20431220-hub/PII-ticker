@@ -86,7 +86,7 @@ components.html(full_html, height=75)
 st.caption(f"최종 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ==========================================
-# 3. 주요 지표 스파크라인 차트 (역동성 해결 완료)
+# 3. 주요 지표 스파크라인 차트 (일직선 오류 해결)
 # ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("📊 주요 지표 및 관심 종목 차트")
@@ -115,8 +115,8 @@ for idx, (name, df) in enumerate(chart_data.items()):
     col = cols[idx % 4]
     with col:
         with st.container(border=True):
-            curr_price = df['Close'].iloc[-1]
-            prev_price = df['Close'].iloc[-2]
+            curr_price = float(df['Close'].iloc[-1])
+            prev_price = float(df['Close'].iloc[-2])
             diff = curr_price - prev_price
             pct = (diff / prev_price) * 100
             
@@ -130,7 +130,6 @@ for idx, (name, df) in enumerate(chart_data.items()):
             color_hex = "#ff4b4b" if diff >= 0 else "#3b82f6"
             sign = "▲" if diff >= 0 else "▼"
             
-            # 여기서 따옴표 오류 났던 부분 완벽 수정
             st.markdown(f"""
             <div>
                 <div style="color: #8b92a5; font-size: 14px; font-weight: 600;">{name}</div>
@@ -142,19 +141,21 @@ for idx, (name, df) in enumerate(chart_data.items()):
             chart_df = df.reset_index()
             chart_df = chart_df.rename(columns={chart_df.columns[0]: 'Date'})
             
-            # 주가 최저/최고점을 타이트하게 잡아 차트를 역동적이게 만듦
-            min_val = chart_df['Close'].min()
-            max_val = chart_df['Close'].max()
-            margin = (max_val - min_val) * 0.05 if max_val != min_val else 1
+            # 💡 [핵심 수정] 0이 아닌 차트의 최저점을 바닥(bottom_val)으로 강제 고정
+            min_val = float(chart_df['Close'].min())
+            max_val = float(chart_df['Close'].max())
+            margin = (max_val - min_val) * 0.1 if max_val != min_val else 1
+            bottom_val = min_val - margin
             
             base_chart = alt.Chart(chart_df).encode(
                 x=alt.X('Date:T', axis=None), 
-                y=alt.Y('Close:Q', scale=alt.Scale(domain=[min_val - margin, max_val + margin]), axis=None), 
+                y=alt.Y('Close:Q', scale=alt.Scale(domain=[bottom_val, max_val + margin]), axis=None), 
                 tooltip=['Date:T', 'Close:Q']
             ).properties(height=80) 
             
             line = base_chart.mark_line(color=color_hex, strokeWidth=2)
             
+            # area 차트가 0이 아닌 bottom_val(최저점)까지만 칠해지도록 y2 값 추가
             area = base_chart.mark_area(
                 line={'color': 'transparent'},
                 color=alt.Gradient(
@@ -163,11 +164,13 @@ for idx, (name, df) in enumerate(chart_data.items()):
                            alt.GradientStop(color='rgba(0,0,0,0)', offset=1)],
                     x1=1, x2=1, y1=1, y2=0
                 )
+            ).encode(
+                y2=alt.datum(bottom_val)
             )
             st.altair_chart(area + line, use_container_width=True)
 
 # ==========================================
-# 4. 국내 주요 섹터 히트맵 (파이썬 Plotly 버전, 에러 해결)
+# 4. 국내 주요 섹터 히트맵 (파이썬 Plotly 버전)
 # ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("🗺️ 국내 주요 섹터 히트맵 (Market Heatmap)")
@@ -225,7 +228,6 @@ if not heatmap_df.empty:
         marker=dict(line=dict(color='#0e1117', width=2)) 
     )
     
-    # 💡 괄호 및 폰트 충돌(ValueError) 원인 원천 차단
     fig.update_layout(
         margin=dict(t=30, l=10, r=10, b=10),
         paper_bgcolor="#0e1117",
