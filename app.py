@@ -2,7 +2,9 @@ import streamlit as st
 import yfinance as yf
 from datetime import datetime
 import streamlit.components.v1 as components
-import altair as alt # 차트를 그리기 위한 내장 라이브러리
+import altair as alt
+import pandas as pd  # <--- 바로 이 녀석이 빠져있었습니다!
+import plotly.express as px
 
 # 1. 페이지 설정
 st.set_page_config(page_title="PII Premium Ticker", layout="wide")
@@ -260,4 +262,5 @@ if not heatmap_df.empty:
 
     # Streamlit 화면에 꽉 차게 출력
     st.plotly_chart(fig, use_container_width=True)
+
 
