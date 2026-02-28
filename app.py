@@ -6,10 +6,11 @@ import altair as alt
 import pandas as pd
 import plotly.express as px
 
-# 1. 페이지 설정
+# ==========================================
+# 1. 페이지 및 기본 설정
+# ==========================================
 st.set_page_config(page_title="PII Premium Ticker", layout="wide")
 
-# 2. 영문 이름과 한글 이름을 튜플로 매핑 (티커)
 ticker_map = {
     "USDKRW=X": ("USD/KRW", "미국달러/원"),
     "^TNX": ("US 10Y", "미국채 10년"),
@@ -26,6 +27,9 @@ ticker_map = {
     "^KQ11": ("KOSDAQ", "코스닥")
 }
 
+# ==========================================
+# 2. 상단 흐르는 티커 전광판
+# ==========================================
 ticker_html = ""
 
 for ticker, (eng_name, kor_name) in ticker_map.items():
@@ -50,50 +54,29 @@ for ticker, (eng_name, kor_name) in ticker_map.items():
     except:
         continue
 
-# 3. 완벽하게 격리된 HTML/CSS (상단 전광판)
 full_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
 <style>
-    body {{
-        margin: 0; padding: 0; background-color: #0e1117;
-        font-family: -apple-system, sans-serif;
-    }}
-    .ticker-container {{
-        width: 100%; overflow: hidden; background-color: #131722; 
-        padding: 12px 0; border-top: 1px solid #2a2e39; border-bottom: 1px solid #2a2e39;
-    }}
-    .ticker-track {{
-        display: flex; white-space: nowrap; width: max-content;
-        animation: scroll 45s linear infinite;
-    }}
-    .ticker-container:hover .ticker-track {{
-        animation-play-state: paused; cursor: pointer;
-    }}
-    .ticker-card {{
-        display: inline-flex; align-items: center; padding: 0 35px; border-right: 1px solid #2a2e39;
-    }}
-    .symbol-info {{
-        display: flex; flex-direction: column; margin-right: 15px; justify-content: center;
-    }}
+    body {{ margin: 0; padding: 0; background-color: #0e1117; font-family: -apple-system, sans-serif; }}
+    .ticker-container {{ width: 100%; overflow: hidden; background-color: #131722; padding: 12px 0; border-top: 1px solid #2a2e39; border-bottom: 1px solid #2a2e39; }}
+    .ticker-track {{ display: flex; white-space: nowrap; width: max-content; animation: scroll 45s linear infinite; }}
+    .ticker-container:hover .ticker-track {{ animation-play-state: paused; cursor: pointer; }}
+    .ticker-card {{ display: inline-flex; align-items: center; padding: 0 35px; border-right: 1px solid #2a2e39; }}
+    .symbol-info {{ display: flex; flex-direction: column; margin-right: 15px; justify-content: center; }}
     .symbol-name {{ font-weight: 800; font-size: 1.0rem; color: #ffffff; line-height: 1.2; }}
     .symbol-ko {{ font-weight: 500; font-size: 0.75rem; color: #8b92a5; line-height: 1.2; margin-top: 3px; }}
     .current-price {{ font-weight: 700; font-size: 1.1rem; color: #d1d4dc; margin-right: 12px; }}
     .price-change {{ font-weight: 600; font-size: 1.0rem; }}
     .up {{ color: #ff4b4b !important; }}
     .down {{ color: #3b82f6 !important; }}
-    @keyframes scroll {{
-        0% {{ transform: translateX(0); }}
-        100% {{ transform: translateX(-50%); }}
-    }}
+    @keyframes scroll {{ 0% {{ transform: translateX(0); }} 100% {{ transform: translateX(-50%); }} }}
 </style>
 </head>
 <body>
     <div class="ticker-container">
-        <div class="ticker-track">
-            {ticker_html} {ticker_html}
-        </div>
+        <div class="ticker-track">{ticker_html} {ticker_html}</div>
     </div>
 </body>
 </html>
@@ -103,7 +86,7 @@ components.html(full_html, height=75)
 st.caption(f"최종 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ==========================================
-# 4. 차트 영역 (중복 제거 및 스케일 타이트하게 조정)
+# 3. 주요 지표 스파크라인 차트 (역동성 해결 완료)
 # ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("📊 주요 지표 및 관심 종목 차트")
@@ -147,8 +130,107 @@ for idx, (name, df) in enumerate(chart_data.items()):
             color_hex = "#ff4b4b" if diff >= 0 else "#3b82f6"
             sign = "▲" if diff >= 0 else "▼"
             
+            # 여기서 따옴표 오류 났던 부분 완벽 수정
             st.markdown(f"""
             <div>
                 <div style="color: #8b92a5; font-size: 14px; font-weight: 600;">{name}</div>
                 <div style="color: #d1d4dc; font-size: 24px; font-weight: bold; margin: 4px 0;">{p_str}</div>
-                <div style="color: {color_hex}; font-size: 15px; font-weight: 600; margin-bottom: 8px;">{sign} {abs(diff):.2f} ({pct:+.2f}
+                <div style="color: {color_hex}; font-size: 15px; font-weight: 600; margin-bottom: 8px;">{sign} {abs(diff):.2f} ({pct:+.2f}%)</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            chart_df = df.reset_index()
+            chart_df = chart_df.rename(columns={chart_df.columns[0]: 'Date'})
+            
+            # 주가 최저/최고점을 타이트하게 잡아 차트를 역동적이게 만듦
+            min_val = chart_df['Close'].min()
+            max_val = chart_df['Close'].max()
+            margin = (max_val - min_val) * 0.05 if max_val != min_val else 1
+            
+            base_chart = alt.Chart(chart_df).encode(
+                x=alt.X('Date:T', axis=None), 
+                y=alt.Y('Close:Q', scale=alt.Scale(domain=[min_val - margin, max_val + margin]), axis=None), 
+                tooltip=['Date:T', 'Close:Q']
+            ).properties(height=80) 
+            
+            line = base_chart.mark_line(color=color_hex, strokeWidth=2)
+            
+            area = base_chart.mark_area(
+                line={'color': 'transparent'},
+                color=alt.Gradient(
+                    gradient='linear',
+                    stops=[alt.GradientStop(color=color_hex, offset=0), 
+                           alt.GradientStop(color='rgba(0,0,0,0)', offset=1)],
+                    x1=1, x2=1, y1=1, y2=0
+                )
+            )
+            st.altair_chart(area + line, use_container_width=True)
+
+# ==========================================
+# 4. 국내 주요 섹터 히트맵 (파이썬 Plotly 버전, 에러 해결)
+# ==========================================
+st.markdown("<br>", unsafe_allow_html=True)
+st.subheader("🗺️ 국내 주요 섹터 히트맵 (Market Heatmap)")
+
+@st.cache_data(ttl=600)
+def get_heatmap_data():
+    portfolio = {
+        "반도체": {"삼성전자": "005930.KS", "SK하이닉스": "000660.KS", "한미반도체": "042700.KS"},
+        "배터리/화학": {"LG에너지솔루션": "373220.KS", "POSCO홀딩스": "005490.KS", "LG화학": "051910.KS"},
+        "IT/플랫폼": {"NAVER": "035420.KS", "카카오": "035720.KS"},
+        "자동차": {"현대차": "005380.KS", "기아": "000270.KS"},
+        "바이오": {"삼성바이오로직스": "207940.KS", "셀트리온": "068270.KS"},
+        "금융": {"KB금융": "105560.KS", "신한지주": "055550.KS"}
+    }
+
+    data = []
+    for sector, stocks in portfolio.items():
+        for name, ticker in stocks.items():
+            try:
+                info = yf.Ticker(ticker).fast_info
+                mcap = info['market_cap']
+                price = info['last_price']
+                prev = info['previous_close']
+                pct_change = ((price - prev) / prev) * 100
+
+                data.append({
+                    "섹터": sector,
+                    "종목명": name,
+                    "시가총액": mcap,
+                    "등락률": pct_change,
+                    "텍스트표시": f"<b>{name}</b><br>{pct_change:+.2f}%"
+                })
+            except:
+                continue
+    return pd.DataFrame(data)
+
+with st.spinner("히트맵 데이터를 불러오는 중입니다..."):
+    heatmap_df = get_heatmap_data()
+
+if not heatmap_df.empty:
+    fig = px.treemap(
+        heatmap_df,
+        path=[px.Constant("한국 주요증시"), '섹터', '종목명'], 
+        values='시가총액', 
+        color='등락률',   
+        color_continuous_scale=[[0, '#3b82f6'], [0.5, '#131722'], [1, '#ff4b4b']], 
+        color_continuous_midpoint=0,
+        custom_data=['텍스트표시']
+    )
+
+    fig.update_traces(
+        texttemplate="%{customdata[0]}",
+        textposition="middle center",
+        textfont=dict(color="white", size=16),
+        marker=dict(line=dict(color='#0e1117', width=2)) 
+    )
+    
+    # 💡 괄호 및 폰트 충돌(ValueError) 원인 원천 차단
+    fig.update_layout(
+        margin=dict(t=30, l=10, r=10, b=10),
+        paper_bgcolor="#0e1117",
+        plot_bgcolor="#0e1117",
+        font=dict(color="white")
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
