@@ -190,12 +190,90 @@ import plotly.express as px
 # --- 기존 차트 코드 아래에 붙여넣으세요 ---
 
 st.markdown("<br>", unsafe_allow_html=True)
+st.subheader("📊 주요 지표 및 관심 종목 차트")
+
+# --- 차트 영역 ---
+@st.cache_data(ttl=600)
+def get_chart_data():
+    targets = {
+        "코스피": "^KS11", "코스닥": "^KQ11", "환율(달러/원)": "USDKRW=X",
+        "미국 국채 10년": "^TNX", "국제금": "GC=F", 
+        "삼성전자": "005930.KS", "SK하이닉스": "000660.KS"
+    }
+    hist_data = {}
+    for name, tk in targets.items():
+        try:
+            df = yf.Ticker(tk).history(period="1mo")
+            if not df.empty and len(df) > 1:
+                hist_data[name] = df
+        except:
+            continue
+    return hist_data
+
+chart_data = get_chart_data()
+
+cols = st.columns(4)
+
+for idx, (name, df) in enumerate(chart_data.items()):
+    col = cols[idx % 4]
+    with col:
+        with st.container(border=True):
+            curr_price = df['Close'].iloc[-1]
+            prev_price = df['Close'].iloc[-2]
+            diff = curr_price - prev_price
+            pct = (diff / prev_price) * 100
+            
+            if name in ["삼성전자", "SK하이닉스"]:
+                p_str, d_str = f"{curr_price:,.0f}", f"{diff:,.0f}"
+            elif name == "미국 국채 10년":
+                p_str, d_str = f"{curr_price:.4f}", f"{diff:.4f}"
+            else:
+                p_str, d_str = f"{curr_price:,.2f}", f"{diff:,.2f}"
+                
+            color_hex = "#ff4b4b" if diff >= 0 else "#3b82f6"
+            sign = "▲" if diff >= 0 else "▼"
+            
+            st.markdown(f"""
+            <div>
+                <div style="color: #8b92a5; font-size: 14px; font-weight: 600;">{name}</div>
+                <div style="color: #d1d4dc; font-size: 24px; font-weight: bold; margin: 4px 0;">{p_str}</div>
+                <div style="color: {color_hex}; font-size: 15px; font-weight: 600; margin-bottom: 8px;">{sign} {abs(diff):.2f} ({pct:+.2f}%)</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            chart_df = df.reset_index()
+            chart_df = chart_df.rename(columns={chart_df.columns[0]: 'Date'})
+            
+            # 💡 차트 평평함 해결: 최고/최저점 계산 후 타이트하게 Y축 범위 고정
+            min_val = chart_df['Close'].min()
+            max_val = chart_df['Close'].max()
+            margin = (max_val - min_val) * 0.05 if max_val != min_val else 1
+            
+            base_chart = alt.Chart(chart_df).encode(
+                x=alt.X('Date:T', axis=None), 
+                y=alt.Y('Close:Q', scale=alt.Scale(domain=[min_val - margin, max_val + margin]), axis=None), 
+                tooltip=['Date:T', 'Close:Q']
+            ).properties(height=80) 
+            
+            line = base_chart.mark_line(color=color_hex, strokeWidth=2)
+            
+            area = base_chart.mark_area(
+                line={'color': 'transparent'},
+                color=alt.Gradient(
+                    gradient='linear',
+                    stops=[alt.GradientStop(color=color_hex, offset=0), 
+                           alt.GradientStop(color='rgba(0,0,0,0)', offset=1)],
+                    x1=1, x2=1, y1=1, y2=0
+                )
+            )
+            st.altair_chart(area + line, use_container_width=True)
+
+# --- 히트맵 영역 ---
+st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("🗺️ 국내 주요 섹터 히트맵 (Market Heatmap)")
 
 @st.cache_data(ttl=600)
 def get_heatmap_data():
-    # 시가총액과 등락률을 볼 주요 섹터별 종목 설정
-    # 원하시는 종목(예: 테슬라 'TSLA', 애플 'AAPL' 등)을 여기에 계속 추가할 수 있습니다.
     portfolio = {
         "반도체": {"삼성전자": "005930.KS", "SK하이닉스": "000660.KS", "한미반도체": "042700.KS"},
         "배터리/화학": {"LG에너지솔루션": "373220.KS", "POSCO홀딩스": "005490.KS", "LG화학": "051910.KS"},
@@ -230,36 +308,29 @@ with st.spinner("히트맵 데이터를 불러오는 중입니다..."):
     heatmap_df = get_heatmap_data()
 
 if not heatmap_df.empty:
-    # Plotly를 이용한 트리맵(히트맵) 생성
     fig = px.treemap(
         heatmap_df,
-        path=[px.Constant("한국 주요증시"), '섹터', '종목명'], # 계층 구조 설정
-        values='시가총액', # 사각형 크기
-        color='등락률',   # 사각형 색상
-        color_continuous_scale=[[0, '#3b82f6'], [0.5, '#131722'], [1, '#ff4b4b']], # 파랑 -> 검정 -> 빨강
+        path=[px.Constant("한국 주요증시"), '섹터', '종목명'], 
+        values='시가총액', 
+        color='등락률',   
+        color_continuous_scale=[[0, '#3b82f6'], [0.5, '#131722'], [1, '#ff4b4b']], 
         color_continuous_midpoint=0,
         custom_data=['텍스트표시']
     )
 
-    # 디자인 디테일 튜닝 (트레이딩뷰 다크모드 스타일)
     fig.update_traces(
         texttemplate="%{customdata[0]}",
         textposition="middle center",
         textfont=dict(color="white", size=16),
-        marker=dict(line=dict(color='#0e1117', width=2)) # 블록 사이 간격
+        marker=dict(line=dict(color='#0e1117', width=2)) 
     )
     
-# 디자인 디테일 튜닝 (버전 충돌 없는 안전한 방식 적용)
+    # 💡 괄호 에러 원인 제거 완료
     fig.update_layout(
         margin=dict(t=30, l=10, r=10, b=10),
         paper_bgcolor="#0e1117",
         plot_bgcolor="#0e1117",
-        font=dict(color="white") # 전체 폰트 색상을 하얀색으로 일괄 적용하여 에러 방지
-    )
+        font=dict(color="white")
     )
 
-    # Streamlit 화면에 꽉 차게 출력
     st.plotly_chart(fig, use_container_width=True)
-
-
-
