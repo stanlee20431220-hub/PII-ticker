@@ -167,8 +167,6 @@ for idx, (name, df) in enumerate(chart_data.items()):
 # ==========================================
 # 4. 전체 시장 히트맵 (오리지널 트레이딩뷰 위젯 적용)
 # ==========================================
-st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("🗺️ 전체 시장 히트맵 (Market Heatmap)")
 
 # 한눈에 비교할 수 있도록 미국/한국 탭 구성
 tab1, tab2 = st.tabs(["🇺🇸 S&P 500 (미국)", "🇰🇷 KOSPI (한국)"])
@@ -222,4 +220,5 @@ with tab2:
     </div>
     """
     components.html(kospi_html, height=650)
+
 
