@@ -2,34 +2,53 @@ import streamlit as st
 import yfinance as yf
 from datetime import datetime
 
-# 1. 페이지 설정
-st.set_page_config(page_title="PII Continuous Ticker", layout="wide")
+# 1. 페이지 설정 (전체 폭 사용 및 다크 모드)
+st.set_page_config(page_title="PII TradingView Ticker", layout="wide")
 
-# 2. CSS 개선: 무한 루프를 위해 애니메이션 최적화
+# 2. 트레이딩뷰 스타일 CSS 정의 (디자인 핵심)
 st.markdown("""
     <style>
-    .ticker-wrap {
+    /* 전체 전광판 컨테이너 */
+    .tv-ticker-wrap {
         width: 100%;
         overflow: hidden;
-        background-color: #0e1117; 
-        padding: 12px 0;
-        border-bottom: 2px solid #31333f;
+        background-color: #131722; /* 다크 블루 배경색 */
+        padding: 15px 0;
+        border-bottom: 2px solid #2a2e39; /* 테두리색 */
+        font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif;
     }
-    .ticker {
+    /* 흐르는 텍스트 컨테이너 */
+    .tv-ticker {
         display: inline-block;
         white-space: nowrap;
-        padding-right: 100%; /* 초기 위치 설정 */
-        animation: ticker-move 40s linear infinite; /* 속도 조절 가능 */
+        animation: ticker-move 35s linear infinite;
+        will-change: transform;
     }
-    .ticker__item {
+    /* 각 티커 아이템 스타일 */
+    .tv-ticker__item {
         display: inline-block;
-        padding: 0 40px; /* 지표 간 간격 */
-        font-size: 1.1rem;
+        padding: 0 45px; /* 지표 간 간격 */
+        font-size: 1.2rem;
+        color: #d1d4dc; /* 텍스트색 */
+        border-right: 1px solid #2a2e39; /* 아이템 간 분리선 */
+    }
+    .tv-ticker__name {
+        font-weight: 700;
+        margin-right: 12px;
         color: white;
     }
-    .price-up { color: #ff4b4b; font-weight: bold; }
-    .price-down { color: #0068c9; font-weight: bold; }
+    .tv-ticker__price {
+        font-weight: bold;
+    }
+    .tv-ticker__change {
+        margin-left: 10px;
+        font-size: 1.0rem;
+    }
+    /* 상승/하락 색상 (트레이딩뷰 테마) */
+    .price-up { color: #00897b; }
+    .price-down { color: #ef5350; }
     
+    /* 애니메이션 설정 */
     @keyframes ticker-move {
         0% { transform: translateX(0); }
         100% { transform: translateX(-100%); }
@@ -39,10 +58,10 @@ st.markdown("""
 
 # 3. 데이터 수집
 tickers = {
-    "USDKRW=X": "USD/KRW", "^TNX": "미국채10년", "GC=F": "금",
-    "CL=F": "WTI유가", "DX-Y.NYB": "달러인덱스", "BTC-USD": "BTC",
-    "ETH-USD": "ETH", "XRP-USD": "리플", "^DJI": "다우존스", 
-    "^IXIC": "나스닥", "^GSPC": "S&P500", "^KS11": "코스피", "^KQ11": "코스닥"
+    "USDKRW=X": "USD/KRW", "^TNX": "US 10YR", "GC=F": "GOLD",
+    "CL=F": "WTI", "DX-Y.NYB": "DXY", "BTC-USD": "BTC",
+    "ETH-USD": "ETH", "XRP-USD": "XRP", "^DJI": "DJI", 
+    "^IXIC": "IXIC", "^GSPC": "SPX500", "^KS11": "KOSPI", "^KQ11": "KOSDAQ"
 }
 
 ticker_items_html = ""
@@ -52,21 +71,32 @@ for ticker, name in tickers.items():
     try:
         data = yf.Ticker(ticker).fast_info
         price = data['last_price']
-        change_pct = ((price - data['previous_close']) / data['previous_close']) * 100
+        prev_close = data['previous_close']
+        change_pct = ((price - prev_close) / prev_close) * 100
+        
+        # 상승/하락에 따른 색상 및 기호 설정
         color_class = "price-up" if change_pct >= 0 else "price-down"
         sign = "+" if change_pct >= 0 else ""
         
-        ticker_items_html += f'<div class="ticker__item">{name} {price:,.2f} <span class="{color_class}">{sign}{change_pct:.2f}%</span></div>'
+        # 각 지표 HTML 아이템 생성
+        ticker_items_html += f"""
+        <div class="tv-ticker__item">
+            <span class="tv-ticker__name">{name}</span>
+            <span class="tv-ticker__price {color_class}">{price:,.2f}</span>
+            <span class="tv-ticker__change {color_class}">{sign}{change_pct:.2f}%</span>
+        </div>
+        """
     except:
         continue
 
-# 4. 화면 출력 (동일한 내용을 두 번 반복하여 공백 제거)
+# 4. 화면 출력 (동일한 내용을 두 번 반복하여 무한 루프 구현)
 st.markdown(f"""
-    <div class="ticker-wrap">
-        <div class="ticker">
+    <div class="tv-ticker-wrap">
+        <div class="tv-ticker">
             {ticker_items_html} {ticker_items_html}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-st.caption(f"Last Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+# 하단 업데이트 시간
+st.caption(f"Final Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
