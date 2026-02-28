@@ -249,18 +249,17 @@ if not heatmap_df.empty:
         marker=dict(line=dict(color='#0e1117', width=2)) # 블록 사이 간격
     )
     
+# 디자인 디테일 튜닝 (버전 충돌 없는 안전한 방식 적용)
     fig.update_layout(
         margin=dict(t=30, l=10, r=10, b=10),
         paper_bgcolor="#0e1117",
         plot_bgcolor="#0e1117",
-        coloraxis_colorbar=dict(
-            title="등락률 (%)",
-            tickfont=dict(color="white"),
-            titlefont=dict(color="white")
-        )
+        font=dict(color="white") # 전체 폰트 색상을 하얀색으로 일괄 적용하여 에러 방지
+    )
     )
 
     # Streamlit 화면에 꽉 차게 출력
     st.plotly_chart(fig, use_container_width=True)
+
 
 
