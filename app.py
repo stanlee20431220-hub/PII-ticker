@@ -82,7 +82,6 @@ full_html = f"""
 """
 
 components.html(full_html, height=75)
-st.caption(f"최종 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ==========================================
 # 3. 주요 지표 스파크라인 차트 (역동성 해결 유지)
@@ -221,3 +220,4 @@ with tab2:
     </div>
     """
     components.html(kospi_html, height=650)
+
