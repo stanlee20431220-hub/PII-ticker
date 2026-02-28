@@ -2,50 +2,52 @@ import streamlit as st
 import yfinance as yf
 from datetime import datetime
 
-# 1. 페이지 설정 (전체 폭 사용 및 메뉴 숨기기)
-st.set_page_config(page_title="PII Ticker Tape", layout="wide")
+# 1. 페이지 설정
+st.set_page_config(page_title="PII Continuous Ticker", layout="wide")
 
-# 2. CSS를 이용한 흐르는 애니메이션 정의
+# 2. CSS 개선: 무한 루프를 위해 애니메이션 최적화
 st.markdown("""
     <style>
     .ticker-wrap {
         width: 100%;
         overflow: hidden;
         background-color: #0e1117; 
-        padding: 10px 0;
-        border-bottom: 1px solid #31333f;
+        padding: 12px 0;
+        border-bottom: 2px solid #31333f;
     }
     .ticker {
         display: inline-block;
         white-space: nowrap;
-        animation: ticker 30s linear infinite;
+        padding-right: 100%; /* 초기 위치 설정 */
+        animation: ticker-move 40s linear infinite; /* 속도 조절 가능 */
     }
     .ticker__item {
         display: inline-block;
-        padding: 0 30px;
-        font-size: 1.2rem;
+        padding: 0 40px; /* 지표 간 간격 */
+        font-size: 1.1rem;
         color: white;
     }
-    .price-up { color: #ff4b4b; }
-    .price-down { color: #0068c9; }
+    .price-up { color: #ff4b4b; font-weight: bold; }
+    .price-down { color: #0068c9; font-weight: bold; }
     
-    @keyframes ticker {
-        0% { transform: translateX(100%); }
+    @keyframes ticker-move {
+        0% { transform: translateX(0); }
         100% { transform: translateX(-100%); }
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 수집 함수
+# 3. 데이터 수집
 tickers = {
     "USDKRW=X": "USD/KRW", "^TNX": "미국채10년", "GC=F": "금",
     "CL=F": "WTI유가", "DX-Y.NYB": "달러인덱스", "BTC-USD": "BTC",
-    "ETH-USD": "ETH", "^DJI": "다우존스", "^IXIC": "나스닥", 
-    "^GSPC": "S&P500", "^KS11": "코스피", "^KQ11": "코스닥"
+    "ETH-USD": "ETH", "XRP-USD": "리플", "^DJI": "다우존스", 
+    "^IXIC": "나스닥", "^GSPC": "S&P500", "^KS11": "코스피", "^KQ11": "코스닥"
 }
 
 ticker_items_html = ""
 
+# 데이터 가져오기 및 HTML 구성
 for ticker, name in tickers.items():
     try:
         data = yf.Ticker(ticker).fast_info
@@ -54,20 +56,17 @@ for ticker, name in tickers.items():
         color_class = "price-up" if change_pct >= 0 else "price-down"
         sign = "+" if change_pct >= 0 else ""
         
-        # 각 아이템을 HTML 문자열로 생성
-        ticker_items_html += f'<div class="ticker__item"><b>{name}</b> {price:,.2f} <span class="{color_class}">{sign}{change_pct:.2f}%</span></div>'
+        ticker_items_html += f'<div class="ticker__item">{name} {price:,.2f} <span class="{color_class}">{sign}{change_pct:.2f}%</span></div>'
     except:
         continue
 
-# 4. 화면에 흐르는 전광판 출력
+# 4. 화면 출력 (동일한 내용을 두 번 반복하여 공백 제거)
 st.markdown(f"""
     <div class="ticker-wrap">
         <div class="ticker">
-            {ticker_items_html}
+            {ticker_items_html} {ticker_items_html}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# 하단에 기존 그리드 방식도 유지하고 싶다면 아래 주석을 해제하세요.
-# st.write("---")
-# (이전의 st.columns 코드를 여기에 넣을 수 있습니다)
+st.caption(f"Last Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
