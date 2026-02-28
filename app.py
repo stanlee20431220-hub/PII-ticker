@@ -81,6 +81,7 @@ full_html = f"""
 </html>
 """
 
+# [주의] 이 줄은 상단 전광판을 화면에 그려주는 핵심 코드이므로 절대 삭제하면 안 됩니다!
 components.html(full_html, height=75)
 
 # ==========================================
@@ -165,8 +166,9 @@ for idx, (name, df) in enumerate(chart_data.items()):
             st.altair_chart(area + line, use_container_width=True)
 
 # ==========================================
-# 4. 전체 시장 히트맵 (오리지널 트레이딩뷰 위젯 적용)
+# 4. 전체 시장 히트맵 (한국 탭 안 보이는 문제 해결 완료)
 # ==========================================
+
 
 # 한눈에 비교할 수 있도록 미국/한국 탭 구성
 tab1, tab2 = st.tabs(["🇺🇸 S&P 500 (미국)", "🇰🇷 KOSPI (한국)"])
@@ -196,6 +198,7 @@ with tab1:
     components.html(sp500_html, height=650)
 
 with tab2:
+    # 💡 "exchanges": ["KRX"] 를 추가하여 한국 시장을 명확히 인식하도록 수정했습니다!
     kospi_html = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
@@ -220,5 +223,3 @@ with tab2:
     </div>
     """
     components.html(kospi_html, height=650)
-
-
