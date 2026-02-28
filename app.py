@@ -198,17 +198,21 @@ with tab1:
     components.html(sp500_html, height=600)
 
 with tab2:
-    # 🇰🇷 한국 시장은 파이썬으로 최대한 빽빽하게 커스텀 구성
+    # 🇰🇷 한국 시장: 네이버 금융 시가총액 TOP 10 섹터 기준 빽빽한 커스텀 구성
     @st.cache_data(ttl=600)
     def get_korea_dense_heatmap():
-        # 종목을 대폭 늘려서 트레이딩뷰처럼 밀도 있게 만듭니다.
+        # 네이버 금융 TOP 10 섹터와 각 섹터별 대표 우량주 매핑
         portfolio = {
-            "반도체": {"삼성전자": "005930.KS", "SK하이닉스": "000660.KS", "한미반도체": "042700.KS", "리노공업": "058470.KQ"},
-            "배터리": {"LG에너지솔루션": "373220.KS", "POSCO홀딩스": "005490.KS", "삼성SDI": "006400.KS", "에코프로비엠": "247540.KQ"},
-            "IT/플랫폼": {"NAVER": "035420.KS", "카카오": "035720.KS", "크래프톤": "259960.KS", "엔씨소프트": "036570.KS"},
+            "반도체와반도체장비": {"삼성전자": "005930.KS", "SK하이닉스": "000660.KS", "한미반도체": "042700.KS", "리노공업": "058470.KQ"},
+            "제약": {"삼성바이오로직스": "207940.KS", "셀트리온": "068270.KS", "유한양행": "000100.KS", "한미약품": "128940.KS"},
             "자동차": {"현대차": "005380.KS", "기아": "000270.KS", "현대모비스": "012330.KS"},
-            "바이오": {"삼성바이오로직스": "207940.KS", "셀트리온": "068270.KS", "알테오젠": "196170.KQ"},
-            "금융": {"KB금융": "105560.KS", "신한지주": "055550.KS", "하나금융지주": "086790.KS", "메리츠금융지주": "138040.KS"}
+            "복합기업": {"삼성물산": "028260.KS", "SK": "034730.KS", "LG": "003550.KS", "CJ": "001040.KS"},
+            "은행": {"KB금융": "105560.KS", "신한지주": "055550.KS", "하나금융지주": "086790.KS", "우리금융지주": "316140.KS"},
+            "조선": {"HD한국조선해양": "009540.KS", "삼성중공업": "010140.KS", "한화오션": "042660.KS", "HD현대중공업": "329180.KS"},
+            "전기제품": {"LG에너지솔루션": "373220.KS", "삼성SDI": "006400.KS", "에코프로비엠": "247540.KQ", "엘앤에프": "066970.KS"},
+            "우주항공과국방": {"한화에어로스페이스": "012450.KS", "한국항공우주": "047810.KS", "LIG넥스원": "079550.KS", "현대로템": "064350.KS"},
+            "기계": {"두산에너빌리티": "034020.KS", "HD현대일렉트릭": "267260.KS", "LS ELECTRIC": "010120.KS"},
+            "증권": {"미래에셋증권": "006800.KS", "한국금융지주": "071050.KS", "NH투자증권": "005940.KS", "삼성증권": "016360.KS"}
         }
         data = []
         for sector, stocks in portfolio.items():
@@ -227,13 +231,13 @@ with tab2:
                     continue
         return pd.DataFrame(data)
 
-    with st.spinner("한국 시장 데이터를 불러오는 중입니다..."):
+    with st.spinner("한국 시장 데이터를 불러오는 중입니다... (약 10초 소요)"):
         heatmap_df = get_korea_dense_heatmap()
 
     if not heatmap_df.empty:
         fig = px.treemap(
             heatmap_df,
-            path=[px.Constant("KOSPI/KOSDAQ"), '섹터', '종목명'], 
+            path=[px.Constant("한국 TOP 10 섹터"), '섹터', '종목명'], 
             values='시가총액', 
             color='등락률',   
             color_continuous_scale=[[0, '#3b82f6'], [0.5, '#131722'], [1, '#ff4b4b']], # 파랑-검정-빨강
@@ -245,16 +249,16 @@ with tab2:
         fig.update_traces(
             texttemplate="%{customdata[0]}",
             textposition="middle center",
-            textfont=dict(color="white", size=14),
+            textfont=dict(color="white", size=13),
             marker=dict(line=dict(color='#0e1117', width=1)),
-            hovertemplate="<b>%{label}</b><br>등락률: %{color:+.2f}%<br>시가총액: %{value:,.0f}<extra></extra>"
+            hovertemplate="<b>%{label}</b><br>등락률: %{color:+.2f}%<br>시가총액: %{value:,.0f}<extra></embed>"
         )
         
         fig.update_layout(
-            margin=dict(t=0, l=0, r=0, b=0), # 여백 0으로 꽉 차게
+            margin=dict(t=30, l=0, r=0, b=0), # 상단 여백만 살짝 남김
             paper_bgcolor="#0e1117",
             plot_bgcolor="#0e1117",
-            height=600,
-            coloraxis_showscale=False # 지저분한 컬러바 숨김
+            height=650,
+            coloraxis_showscale=False # 컬러바 숨김
         )
         st.plotly_chart(fig, use_container_width=True)
