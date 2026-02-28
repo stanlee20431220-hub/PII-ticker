@@ -4,7 +4,6 @@ from datetime import datetime
 import streamlit.components.v1 as components
 import altair as alt
 import pandas as pd
-import plotly.express as px
 
 # ==========================================
 # 1. 페이지 및 기본 설정
@@ -86,7 +85,7 @@ components.html(full_html, height=75)
 st.caption(f"최종 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ==========================================
-# 3. 주요 지표 스파크라인 차트 (일직선 오류 해결)
+# 3. 주요 지표 스파크라인 차트 (역동성 해결 유지)
 # ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("📊 주요 지표 및 관심 종목 차트")
@@ -141,7 +140,6 @@ for idx, (name, df) in enumerate(chart_data.items()):
             chart_df = df.reset_index()
             chart_df = chart_df.rename(columns={chart_df.columns[0]: 'Date'})
             
-            # 💡 [핵심 수정] 0이 아닌 차트의 최저점을 바닥(bottom_val)으로 강제 고정
             min_val = float(chart_df['Close'].min())
             max_val = float(chart_df['Close'].max())
             margin = (max_val - min_val) * 0.1 if max_val != min_val else 1
@@ -155,7 +153,6 @@ for idx, (name, df) in enumerate(chart_data.items()):
             
             line = base_chart.mark_line(color=color_hex, strokeWidth=2)
             
-            # area 차트가 0이 아닌 bottom_val(최저점)까지만 칠해지도록 y2 값 추가
             area = base_chart.mark_area(
                 line={'color': 'transparent'},
                 color=alt.Gradient(
@@ -164,75 +161,63 @@ for idx, (name, df) in enumerate(chart_data.items()):
                            alt.GradientStop(color='rgba(0,0,0,0)', offset=1)],
                     x1=1, x2=1, y1=1, y2=0
                 )
-            ).encode(
-                y2=alt.datum(bottom_val)
-            )
+            ).encode(y2=alt.datum(bottom_val))
+            
             st.altair_chart(area + line, use_container_width=True)
 
 # ==========================================
-# 4. 국내 주요 섹터 히트맵 (파이썬 Plotly 버전)
+# 4. 전체 시장 히트맵 (오리지널 트레이딩뷰 위젯 적용)
 # ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("🗺️ 국내 주요 섹터 히트맵 (Market Heatmap)")
+st.subheader("🗺️ 전체 시장 히트맵 (Market Heatmap)")
 
-@st.cache_data(ttl=600)
-def get_heatmap_data():
-    portfolio = {
-        "반도체": {"삼성전자": "005930.KS", "SK하이닉스": "000660.KS", "한미반도체": "042700.KS"},
-        "배터리/화학": {"LG에너지솔루션": "373220.KS", "POSCO홀딩스": "005490.KS", "LG화학": "051910.KS"},
-        "IT/플랫폼": {"NAVER": "035420.KS", "카카오": "035720.KS"},
-        "자동차": {"현대차": "005380.KS", "기아": "000270.KS"},
-        "바이오": {"삼성바이오로직스": "207940.KS", "셀트리온": "068270.KS"},
-        "금융": {"KB금융": "105560.KS", "신한지주": "055550.KS"}
-    }
+# 한눈에 비교할 수 있도록 미국/한국 탭 구성
+tab1, tab2 = st.tabs(["🇺🇸 S&P 500 (미국)", "🇰🇷 KOSPI (한국)"])
 
-    data = []
-    for sector, stocks in portfolio.items():
-        for name, ticker in stocks.items():
-            try:
-                info = yf.Ticker(ticker).fast_info
-                mcap = info['market_cap']
-                price = info['last_price']
-                prev = info['previous_close']
-                pct_change = ((price - prev) / prev) * 100
+with tab1:
+    sp500_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
+      {
+        "exchanges": [],
+        "dataSource": "SPX500",
+        "grouping": "sector",
+        "blockSize": "market_cap_basic",
+        "blockColor": "change",
+        "locale": "kr",
+        "symbolUrl": "",
+        "colorTheme": "dark",
+        "hasTopBar": true,
+        "isTransparent": true,
+        "width": "100%",
+        "height": "650"
+      }
+      </script>
+    </div>
+    """
+    components.html(sp500_html, height=650)
 
-                data.append({
-                    "섹터": sector,
-                    "종목명": name,
-                    "시가총액": mcap,
-                    "등락률": pct_change,
-                    "텍스트표시": f"<b>{name}</b><br>{pct_change:+.2f}%"
-                })
-            except:
-                continue
-    return pd.DataFrame(data)
-
-with st.spinner("히트맵 데이터를 불러오는 중입니다..."):
-    heatmap_df = get_heatmap_data()
-
-if not heatmap_df.empty:
-    fig = px.treemap(
-        heatmap_df,
-        path=[px.Constant("한국 주요증시"), '섹터', '종목명'], 
-        values='시가총액', 
-        color='등락률',   
-        color_continuous_scale=[[0, '#3b82f6'], [0.5, '#131722'], [1, '#ff4b4b']], 
-        color_continuous_midpoint=0,
-        custom_data=['텍스트표시']
-    )
-
-    fig.update_traces(
-        texttemplate="%{customdata[0]}",
-        textposition="middle center",
-        textfont=dict(color="white", size=16),
-        marker=dict(line=dict(color='#0e1117', width=2)) 
-    )
-    
-    fig.update_layout(
-        margin=dict(t=30, l=10, r=10, b=10),
-        paper_bgcolor="#0e1117",
-        plot_bgcolor="#0e1117",
-        font=dict(color="white")
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
+with tab2:
+    kospi_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
+      {
+        "exchanges": [],
+        "dataSource": "KOSPI",
+        "grouping": "sector",
+        "blockSize": "market_cap_basic",
+        "blockColor": "change",
+        "locale": "kr",
+        "symbolUrl": "",
+        "colorTheme": "dark",
+        "hasTopBar": true,
+        "isTransparent": true,
+        "width": "100%",
+        "height": "650"
+      }
+      </script>
+    </div>
+    """
+    components.html(kospi_html, height=650)
