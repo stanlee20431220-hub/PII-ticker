@@ -4,6 +4,7 @@ from datetime import datetime
 import streamlit.components.v1 as components
 import altair as alt
 import pandas as pd
+import plotly.express as px
 
 # ==========================================
 # 1. 페이지 및 기본 설정
@@ -80,12 +81,10 @@ full_html = f"""
 </body>
 </html>
 """
-
-# [주의] 이 줄은 상단 전광판을 화면에 그려주는 핵심 코드이므로 절대 삭제하면 안 됩니다!
 components.html(full_html, height=75)
 
 # ==========================================
-# 3. 주요 지표 스파크라인 차트 (역동성 해결 유지)
+# 3. 주요 지표 스파크라인 차트
 # ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("📊 주요 지표 및 관심 종목 차트")
@@ -166,14 +165,15 @@ for idx, (name, df) in enumerate(chart_data.items()):
             st.altair_chart(area + line, use_container_width=True)
 
 # ==========================================
-# 4. 전체 시장 히트맵 (한국 탭 안 보이는 문제 해결 완료)
+# 4. 하이브리드 시장 히트맵 (미국: TV / 한국: Custom)
 # ==========================================
+st.markdown("<br>", unsafe_allow_html=True)
+st.subheader("🗺️ 시장 히트맵 (Market Heatmap)")
 
-
-# 한눈에 비교할 수 있도록 미국/한국 탭 구성
-tab1, tab2 = st.tabs(["🇺🇸 S&P 500 (미국)", "🇰🇷 KOSPI (한국)"])
+tab1, tab2 = st.tabs(["🇺🇸 S&P 500 (미국)", "🇰🇷 국내 주요 섹터 (한국)"])
 
 with tab1:
+    # 🇺🇸 미국 시장은 완벽한 트레이딩뷰 위젯 사용
     sp500_html = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
@@ -190,33 +190,71 @@ with tab1:
         "hasTopBar": true,
         "isTransparent": true,
         "width": "100%",
-        "height": "650"
+        "height": "600"
       }
       </script>
     </div>
     """
-    components.html(sp500_html, height=650)
+    components.html(sp500_html, height=600)
 
 with tab2:
-    kospi_html = """
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
-      {
-        "exchanges": [],
-        "dataSource": "KR",
-        "grouping": "sector",
-        "blockSize": "market_cap_basic",
-        "blockColor": "change",
-        "locale": "kr",
-        "symbolUrl": "",
-        "colorTheme": "dark",
-        "hasTopBar": true,
-        "isTransparent": true,
-        "width": "100%",
-        "height": "650"
-      }
-      </script>
-    </div>
-    """
-    components.html(kospi_html, height=650)
+    # 🇰🇷 한국 시장은 파이썬으로 최대한 빽빽하게 커스텀 구성
+    @st.cache_data(ttl=600)
+    def get_korea_dense_heatmap():
+        # 종목을 대폭 늘려서 트레이딩뷰처럼 밀도 있게 만듭니다.
+        portfolio = {
+            "반도체": {"삼성전자": "005930.KS", "SK하이닉스": "000660.KS", "한미반도체": "042700.KS", "리노공업": "058470.KQ"},
+            "배터리": {"LG에너지솔루션": "373220.KS", "POSCO홀딩스": "005490.KS", "삼성SDI": "006400.KS", "에코프로비엠": "247540.KQ"},
+            "IT/플랫폼": {"NAVER": "035420.KS", "카카오": "035720.KS", "크래프톤": "259960.KS", "엔씨소프트": "036570.KS"},
+            "자동차": {"현대차": "005380.KS", "기아": "000270.KS", "현대모비스": "012330.KS"},
+            "바이오": {"삼성바이오로직스": "207940.KS", "셀트리온": "068270.KS", "알테오젠": "196170.KQ"},
+            "금융": {"KB금융": "105560.KS", "신한지주": "055550.KS", "하나금융지주": "086790.KS", "메리츠금융지주": "138040.KS"}
+        }
+        data = []
+        for sector, stocks in portfolio.items():
+            for name, ticker in stocks.items():
+                try:
+                    info = yf.Ticker(ticker).fast_info
+                    mcap = info['market_cap']
+                    price = info['last_price']
+                    prev = info['previous_close']
+                    pct = ((price - prev) / prev) * 100
+                    data.append({
+                        "섹터": sector, "종목명": name, "시가총액": mcap, "등락률": pct,
+                        "텍스트표시": f"<b>{name}</b><br>{pct:+.2f}%"
+                    })
+                except:
+                    continue
+        return pd.DataFrame(data)
+
+    with st.spinner("한국 시장 데이터를 불러오는 중입니다..."):
+        heatmap_df = get_korea_dense_heatmap()
+
+    if not heatmap_df.empty:
+        fig = px.treemap(
+            heatmap_df,
+            path=[px.Constant("KOSPI/KOSDAQ"), '섹터', '종목명'], 
+            values='시가총액', 
+            color='등락률',   
+            color_continuous_scale=[[0, '#3b82f6'], [0.5, '#131722'], [1, '#ff4b4b']], # 파랑-검정-빨강
+            color_continuous_midpoint=0,
+            custom_data=['텍스트표시']
+        )
+        
+        # 디자인 튜닝: 테두리를 얇게 하고 여백을 없애 빽빽하게 만듦
+        fig.update_traces(
+            texttemplate="%{customdata[0]}",
+            textposition="middle center",
+            textfont=dict(color="white", size=14),
+            marker=dict(line=dict(color='#0e1117', width=1)),
+            hovertemplate="<b>%{label}</b><br>등락률: %{color:+.2f}%<br>시가총액: %{value:,.0f}<extra></extra>"
+        )
+        
+        fig.update_layout(
+            margin=dict(t=0, l=0, r=0, b=0), # 여백 0으로 꽉 차게
+            paper_bgcolor="#0e1117",
+            plot_bgcolor="#0e1117",
+            height=600,
+            coloraxis_showscale=False # 지저분한 컬러바 숨김
+        )
+        st.plotly_chart(fig, use_container_width=True)
