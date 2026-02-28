@@ -198,16 +198,13 @@ with tab1:
     components.html(sp500_html, height=650)
 
 with tab2:
-    # 💡 "exchanges": ["KRX"] 를 추가하여 한국 시장을 명확히 인식하도록 수정했습니다!
     kospi_html = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
       {
-        "exchanges": [
-          "KRX"
-        ],
-        "dataSource": "KOSPI",
+        "exchanges": [],
+        "dataSource": "KR",
         "grouping": "sector",
         "blockSize": "market_cap_basic",
         "blockColor": "change",
