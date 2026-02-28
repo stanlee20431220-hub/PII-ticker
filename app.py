@@ -100,11 +100,6 @@ full_html = f"""
 components.html(full_html, height=75)
 st.caption(f"최종 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("📊 주요 지표 및 관심 종목 차트")
-
-st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("📊 주요 지표 및 관심 종목 차트")
 
 # 4. 차트 데이터를 가져오는 함수 (1개월치 데이터 로드)
 @st.cache_data(ttl=600)
@@ -265,3 +260,4 @@ if not heatmap_df.empty:
 
     # Streamlit 화면에 꽉 차게 출력
     st.plotly_chart(fig, use_container_width=True)
+
